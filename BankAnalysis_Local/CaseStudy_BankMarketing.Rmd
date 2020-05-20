@@ -1,0 +1,45 @@
+---
+title: "Case Study - Bank Marketing"
+output: html_notebook
+---
+
+Step 1) Import Data
+```{r}
+setwd("~/Jobs/Quicken_DataSolutionsAnalyst/CaseStudy")
+library(readr)
+ bank <- read_delim("bank/bank.csv", 
+    ";", 
+    escape_double = FALSE ,
+    col_types = cols(age = col_integer(), 
+         balance = col_double(), campaign = col_integer(), 
+         contact = col_character(), day = col_integer(), 
+         default = col_factor(levels = c("yes", 
+             "no")), duration = col_double(), 
+         education = col_character(), housing = col_factor(levels = c("yes", 
+             "no")), job = col_character(), 
+         marital = col_character(), month = col_character(), 
+         pdays = col_double(), poutcome = col_character(), 
+         y = col_factor(levels = c("yes", 
+             "no"))), 
+     na = "unknown", 
+     trim_ws = TRUE)
+ 
+bank_full <- read_delim("bank/bank-full.csv", 
+     ";", 
+     escape_double = FALSE, 
+     col_types = cols(age = col_integer(), 
+         balance = col_double(), campaign = col_integer(), 
+         contact = col_character(), day = col_integer(), 
+         default = col_factor(levels = c("yes", 
+             "no")), duration = col_double(), 
+         education = col_character(), housing = col_factor(levels = c("yes", 
+             "no")), job = col_character(), 
+         marital = col_character(), month = col_character(), 
+         pdays = col_double(), poutcome = col_character(), 
+         y = col_factor(levels = c("yes", 
+             "no"))), 
+     na = "unknown", 
+     trim_ws = TRUE)
+
+ 
+```
