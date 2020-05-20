@@ -1,2 +1,2 @@
 # MyProjects
- My projects created wiht R
+ My projects created with R
