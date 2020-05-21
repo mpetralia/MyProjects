@@ -3,26 +3,48 @@ title: "Case Study - Bank Marketing"
 output: html_notebook
 ---
 
+Goal: predict if the client will subscribe a term deposit (variable y)
+  Note: Y will be a binomial result, either yes or no
+
 Step 1) Import Data
 ```{r}
-setwd("~/Jobs/Quicken_DataSolutionsAnalyst/CaseStudy")
+getwd()
+setwd( paste(getwd() , "/BankAnalysis_Study"))
 library(readr)
- bank <- read_delim("bank/bank.csv", 
-    ";", 
-    escape_double = FALSE ,
-    col_types = cols(age = col_integer(), 
-         balance = col_double(), campaign = col_integer(), 
-         contact = col_character(), day = col_integer(), 
-         default = col_factor(levels = c("yes", 
-             "no")), duration = col_double(), 
-         education = col_character(), housing = col_factor(levels = c("yes", 
-             "no")), job = col_character(), 
-         marital = col_character(), month = col_character(), 
-         pdays = col_double(), poutcome = col_character(), 
-         y = col_factor(levels = c("yes", 
-             "no"))), 
-     na = "unknown", 
-     trim_ws = TRUE)
+library(dplyr)
+library(ggplot2)
+ bank <- bank <- read_delim("bank/bank.csv", 
+    ";", escape_double = FALSE, 
+    col_types = cols(age = col_double(), 
+         balance = col_double(), 
+         campaign = col_integer(), 
+         contact = col_factor(levels = c("cellular", "telephone")), 
+         day = col_integer(), 
+         default = col_factor(levels = c("yes","no")), 
+         duration = col_double(), 
+         education = col_factor(levels = c("primary" , "secondary" , "tertiary")),
+        # education = col_factor(levels = c("basic.4y",  "basic.6y", "basic.9y", "high.school", 
+        #     "illiterate", "professional.course", 
+        #     "university.degree")),
+         housing = col_factor(levels = c("yes", "no")),
+         job = col_factor(levels = c("admin.", 
+             "blue-collar", "entrepreneur", 
+             "housemaid", "management", 
+             "retired", "self-employed", 
+             "services", "student", "technician", 
+             "unemployed")), 
+         loan = col_factor(levels = c("yes", "no")), 
+         marital = col_factor(levels = c("divorced", "married", "single")), 
+         month = col_factor(levels = c("jan", 
+             "feb", "mar", "apr", "may", "jun", 
+             "jul", "aug", "sep", "oct", "nov", 
+             "dec")), 
+         pdays = col_number(), 
+         poutcome = col_factor(levels = c("failure", "nonexistent", "success" , "other")), 
+         previous = col_number(), 
+         y = col_factor(levels = c("yes","no"))), 
+    na = "unknown",
+    trim_ws = TRUE)
  
 bank_full <- read_delim("bank/bank-full.csv", 
      ";", 
@@ -41,5 +63,176 @@ bank_full <- read_delim("bank/bank-full.csv",
      na = "unknown", 
      trim_ws = TRUE)
 
+banka <- read_delim("bank-additional/bank-additional/bank-additional.csv", 
+    ";", escape_double = FALSE, 
+    col_types = cols(age = col_double(), 
+          job = col_factor(levels = c("admin.", 
+             "blue-collar", "entrepreneur", 
+             "housemaid", "management", 
+             "retired", "self-employed", 
+             "services", "student", "technician", 
+             "unemployed")), 
+        marital = col_factor(levels = c("divorced", "married", "single")), 
+        education = col_factor(levels = c("basic.4y",  "basic.6y", "basic.9y", "high.school", 
+             "illiterate", "professional.course", 
+             "university.degree")),
+        default = col_factor(levels = c("yes","no")), 
+         housing = col_factor(levels = c("yes", "no")),
+         loan = col_factor(levels = c("yes", "no")), 
+         contact = col_factor(levels = c("cellular", "telephone")), 
+         month = col_factor(levels = c("jan", 
+             "feb", "mar", "apr", "may", "jun", 
+             "jul", "aug", "sep", "oct", "nov", 
+             "dec")),
+        day_of_week = col_factor(levels = c("mon" , "tue","wed","thu", "fri")),
+        duration = col_double(), 
+        campaign = col_integer(), 
+        pdays = col_integer(), #NOTE: 999 is a null value
+        previous = col_integer(),
+        poutcome = col_factor(levels = c("failure", "nonexistent", "success")), 
+        emp.var.rate = col_double(),
+        cons.price.idx = col_double(),
+        cons.conf.idx = col_double(),
+        euribor3m = col_double(),
+        y = col_factor(levels = c("yes","no"))), 
+    na = "unknown",
+    trim_ws = TRUE)
  
+banka_full <- read_delim("bank-additional/bank-additional/bank-additional-full.csv", 
+     ";", 
+     escape_double = FALSE, 
+     col_types = cols(age = col_double(), 
+          job = col_factor(levels = c("admin.", 
+             "blue-collar", "entrepreneur", 
+             "housemaid", "management", 
+             "retired", "self-employed", 
+             "services", "student", "technician", 
+             "unemployed")), 
+        marital = col_factor(levels = c("divorced", "married", "single")), 
+        education = col_factor(levels = c("basic.4y",  "basic.6y", "basic.9y", "high.school", 
+             "illiterate", "professional.course", 
+             "university.degree")),
+        default = col_factor(levels = c("yes","no")), 
+         housing = col_factor(levels = c("yes", "no")),
+         loan = col_factor(levels = c("yes", "no")), 
+         contact = col_factor(levels = c("cellular", "telephone")), 
+         month = col_factor(levels = c("jan", 
+             "feb", "mar", "apr", "may", "jun", 
+             "jul", "aug", "sep", "oct", "nov", 
+             "dec")),
+        day_of_week = col_factor(levels = c("mon" , "tue","wed","thu", "fri")),
+        duration = col_double(), 
+        campaign = col_integer(), 
+        pdays = col_integer(), #NOTE: 999 is a null value
+        previous = col_integer(),
+        poutcome = col_factor(levels = c("failure", "nonexistent", "success")), 
+        emp.var.rate = col_double(),
+        cons.price.idx = col_double(),
+        cons.conf.idx = col_double(),
+        euribor3m = col_double(),
+        y = col_factor(levels = c("yes","no"))), 
+    na = "unknown",
+    trim_ws = TRUE)
+
+
 ```
+Add unqiue ID :
+
+```{r}
+banka$ID <- seq.int(nrow(banka))
+banka_full$ID <- seq.int(nrow(banka_full))
+```
+
+
+
+
+Deal with NULL/missing values
+```{r}
+summary(banka$pdays) 
+banka$pdays[banka$pdays == 999] <- NA
+
+summary(banka_full$pdays) 
+banka_full$pdays[banka_full$pdays == 999] <- NA
+
+na_count <-sapply(banka, function(y) sum(length(which(is.na(y)))))
+na_count 
+
+
+##too many pday values are 999 or NA, create a cateogrical column instead
+banka$contactedprev <- 'Yes'
+banka$contactedprev[ (is.na(banka$pdays))] <- 'No'
+banka$contactedprev <-factor(banka$contactedprev)
+summary(banka$contactedprev)
+
+banka_full$contactedprev <- 'Yes'
+banka_full$contactedprev[ (is.na(banka_full$pdays))] <- 'No' 
+banka_full$contactedprev <-factor(banka_full$contactedprev)
+summary(banka_full$contactedprev)
+```
+Create first model using binomial glm. 
+```{r}
+
+glm.all <- glm( y ~ age + 
+                  job +
+                  marital +
+                  education +
+                  default +
+                  housing +
+                  loan +
+                  contact +
+                  month +
+                  day_of_week +
+                  duration +
+                  campaign +
+                  previous +
+                  poutcome +
+                  contactedprev +
+                  emp.var.rate +
+                  cons.price.idx +
+                  cons.conf.idx +
+                  nr.employed
+                , data = banka , family = binomial) #Note: Used binomial because output is binary
+
+summary(glm.all)
+```
+
+Predict. Store predicted in results data set , and compare to actual
+```{r}
+#predict if the client subsribed to a term deposit
+glm.probs <- predict(glm.all, banka_full, type = "response")
+SubscribedPred =rep( 'no' , nrow(banka_full))
+SubscribedPred[ glm.probs > .5] = 'yes'
+results <- data.frame( banka_full$ID, SubscribedPred, banka_full
+                       $y)
+results <- results %>% mutate( match = ifelse( SubscribedPred == banka_full.y , 1 , 0))
+head(results)
+
+#how well does glm.probs fit test
+table(results$Subscribed, banka_full$y)
+sum(results$match)/nrow(results)
+# 30% correct when predictions for bank-additional-full are compared to actual
+```
+Now, create a model with only the significant variables:
+
+```{r}
+glm.all <- glm( y ~ age + 
+                  job +
+                  marital +
+                  education +
+                  default +
+                  housing +
+                  loan +
+                  contact +
+                  month +
+                  day_of_week +
+                  duration +
+                  campaign +
+                  previous +
+                  contactedprev +
+                  emp.var.rate +
+                  cons.price.idx +
+                  cons.conf.idx +
+                  nr.employed
+                , data = banka , family = binomial) #Note: Used binomial because output is binary
+```
+
