@@ -160,12 +160,12 @@ na_count
 
 ##too many pday values are 999 or NA, create a cateogrical column instead
 banka$contactedprev <- 'Yes'
-banka$contactedprev[ (is.na(banka$pdays))] <- 'No'
+banka$contactedprev[ banka$pdays == 999 ] <- 'No'
 banka$contactedprev <-factor(banka$contactedprev)
 summary(banka$contactedprev)
 
 banka_full$contactedprev <- 'Yes'
-banka_full$contactedprev[ (is.na(banka_full$pdays))] <- 'No' 
+banka_full$contactedprev[ banka_full$pdays == 999 ] <- 'No' 
 banka_full$contactedprev <-factor(banka_full$contactedprev)
 summary(banka_full$contactedprev)
 
@@ -191,16 +191,16 @@ glm.all <- glm( output ~ age +
                    contact +
                    month +
                    day_of_week +
-                   duration +
+                   #duration +
                    campaign +
                    previous +
                    poutcome +
-                   contactedprev +
+                  # contactedprev +
                    emp.var.rate +
                    cons.price.idx +
                    cons.conf.idx +
                    nr.employed
-                , data = banka , family = binomial) #Note: Used binomial because output is binary
+                , data = banka  , family = binomial) #Note: Used binomial because output is binary
 
 summary(glm.all)
 ```
@@ -209,6 +209,7 @@ Predict. Store predicted in results data set , and compare to actual
 ```{r}
 #predict if the client subsribed to a term deposit
 glm.probs <- predict(glm.all, banka_full, type = "response")
+#getting "Prediction from a rank-deficient fit may be misleading" message, because of so many input variables
 SubscribedPred =rep( 0 , nrow(banka_full))
 SubscribedPred[ glm.probs > .5] = 1
 results <- data.frame( banka_full$ID, SubscribedPred, banka_full$output)
@@ -218,7 +219,7 @@ head(results)
 #how well does glm.probs fit test
 table(results$SubscribedPred, banka_full$output)
 sum(results$match)/nrow(results)
-# 30% correct when predictions for bank-additional-full are compared to actual
+#86% correct when predictions for bank-additional-full are compared to actual
 ```
 
 Now, create a model with only the significant variables:
@@ -226,25 +227,29 @@ Now, create a model with only the significant variables:
 ```{r}
 
 #try to better model by switching what variables are used in model
-glm.new <- glm( y ~ age + 
+glm.new <- glm( output ~ 
+                  #age + 
                   job +
-                  marital +
-                  education +
-                  default +
-                  housing +
-                  loan +
+                  #marital +
+                  #education +
+                  #default +
+                  #housing +
+                  #loan +
                   contact +
                   month +
                   day_of_week +
+                  poutcome +
                   #duration +
-                  campaign +
-                  previous +
-                  contactedprev +
+                  #campaign +
+                  #previous +
+                  #contactedprev +
                   emp.var.rate +
                   cons.price.idx +
-                  cons.conf.idx +
-                  nr.employed
-                , data = banka_full , family = binomial) #Note: Used binomial because output is binary
+                  cons.conf.idx 
+                  #nr.employed
+                , data = banka , family = binomial) #Note: Used binomial because output is binary
+
+
 
 ```
 New model:
@@ -254,16 +259,16 @@ summary(glm.new)
 Things to note: Less likely to subscribe to a term deposit on a monday. Also less likely to subscribe Jan-Mar vs any other month. More likely to subscribe if previously contacted. Blue collar are the mosth likely job to say yes to subscribe.
 ```{r}
 #predict if the client subsribed to a term deposit
-glm.probs <- predict(glm.new, banka, type = "response")
-SubscribedPred =rep( 'no' , nrow(banka))
-SubscribedPred[ glm.probs > .5] = 'yes'
-results <- data.frame( banka$ID, SubscribedPred, banka$y)
-results <- results %>% mutate( match = ifelse( SubscribedPred == banka.y , 1 , 0))
+glm.probs <- predict(glm.new, banka_full, type = "response")
+SubscribedPred =rep( 0 , nrow(banka_full))
+SubscribedPred[ glm.probs > .5] = 1
+results <- data.frame( banka_full$ID, SubscribedPred, banka_full$output)
+results <- results %>% mutate( match = ifelse( SubscribedPred == banka_full.output , 1 , 0))
 head(results)
 
 #how well does glm.probs fit test
-table(results$Subscribed, banka$y)
+table(results$SubscribedPred, banka_full$output)
 sum(results$match)/nrow(results)
-# 30% correct when predictions for bank-additional-full are compared to actual
+# 86% correct when predictions for bank-additional-full are compared to actual
 ```
 
