@@ -71,14 +71,14 @@ banka <- read_delim("bank-additional/bank-additional/bank-additional.csv",
              "housemaid", "management", 
              "retired", "self-employed", 
              "services", "student", "technician", 
-             "unemployed")), 
-        marital = col_factor(levels = c("divorced", "married", "single")), 
+             "unemployed" , "unknown")), 
+        marital = col_factor(levels = c("divorced", "married", "single" , "unknown")), 
         education = col_factor(levels = c("basic.4y",  "basic.6y", "basic.9y", "high.school", 
              "illiterate", "professional.course", 
-             "university.degree")),
-        default = col_factor(levels = c("yes","no")), 
-         housing = col_factor(levels = c("yes", "no")),
-         loan = col_factor(levels = c("yes", "no")), 
+             "university.degree" , "unknown")),
+        default = col_factor(levels = c("yes","no", "unknown")), 
+         housing = col_factor(levels = c("yes", "no" , "unknown")),
+         loan = col_factor(levels = c("yes", "no", "unknown" )), 
          contact = col_factor(levels = c("cellular", "telephone")), 
          month = col_factor(levels = c("jan", 
              "feb", "mar", "apr", "may", "jun", 
@@ -95,7 +95,7 @@ banka <- read_delim("bank-additional/bank-additional/bank-additional.csv",
         cons.conf.idx = col_double(),
         euribor3m = col_double(),
         y = col_factor(levels = c("yes","no"))), 
-    na = "unknown",
+    #na = "unknown",
     trim_ws = TRUE)
  
 banka_full <- read_delim("bank-additional/bank-additional/bank-additional-full.csv", 
@@ -107,14 +107,14 @@ banka_full <- read_delim("bank-additional/bank-additional/bank-additional-full.c
              "housemaid", "management", 
              "retired", "self-employed", 
              "services", "student", "technician", 
-             "unemployed")), 
-        marital = col_factor(levels = c("divorced", "married", "single")), 
+             "unemployed" , "unknown")), 
+        marital = col_factor(levels = c("divorced", "married", "single" , "unknown")), 
         education = col_factor(levels = c("basic.4y",  "basic.6y", "basic.9y", "high.school", 
              "illiterate", "professional.course", 
-             "university.degree")),
-        default = col_factor(levels = c("yes","no")), 
-         housing = col_factor(levels = c("yes", "no")),
-         loan = col_factor(levels = c("yes", "no")), 
+             "university.degree" , "unknown")),
+        default = col_factor(levels = c("yes","no", "unknown")), 
+         housing = col_factor(levels = c("yes", "no" , "unknown")),
+         loan = col_factor(levels = c("yes", "no", "unknown" )), 
          contact = col_factor(levels = c("cellular", "telephone")), 
          month = col_factor(levels = c("jan", 
              "feb", "mar", "apr", "may", "jun", 
@@ -130,8 +130,8 @@ banka_full <- read_delim("bank-additional/bank-additional/bank-additional-full.c
         cons.price.idx = col_double(),
         cons.conf.idx = col_double(),
         euribor3m = col_double(),
-        y = col_factor(levels = c("yes","no"))), 
-    na = "unknown",
+        y = col_factor(levels = c("yes","no"))),  
+    #na = "unknown",
     trim_ws = TRUE)
 
 
@@ -168,29 +168,38 @@ banka_full$contactedprev <- 'Yes'
 banka_full$contactedprev[ (is.na(banka_full$pdays))] <- 'No' 
 banka_full$contactedprev <-factor(banka_full$contactedprev)
 summary(banka_full$contactedprev)
+
+#change y column to be 1's and 0's to help model?
+banka$output <- 0 
+#banka$output[banka$y == "no"] <- 0
+banka$output[banka$y == "yes"] <- 1
+
+#change y column to be 1's and 0's to help model?
+banka_full$output <- 0 
+banka_full$output[banka$y == "yes"] <- 1
 ```
 Create first model using binomial glm. 
 ```{r}
 
-glm.all <- glm( y ~ age + 
+glm.all <- glm( output ~ age + 
                   job +
                   marital +
                   education +
-                  default +
-                  housing +
-                  loan +
-                  contact +
-                  month +
-                  day_of_week +
-                  duration +
-                  campaign +
-                  previous +
-                  poutcome +
-                  contactedprev +
-                  emp.var.rate +
-                  cons.price.idx +
-                  cons.conf.idx +
-                  nr.employed
+                   default +
+                   housing +
+                   loan +
+                   contact +
+                   month +
+                   day_of_week +
+                   duration +
+                   campaign +
+                   previous +
+                   poutcome +
+                   contactedprev +
+                   emp.var.rate +
+                   cons.price.idx +
+                   cons.conf.idx +
+                   nr.employed
                 , data = banka , family = binomial) #Note: Used binomial because output is binary
 
 summary(glm.all)
@@ -200,22 +209,24 @@ Predict. Store predicted in results data set , and compare to actual
 ```{r}
 #predict if the client subsribed to a term deposit
 glm.probs <- predict(glm.all, banka_full, type = "response")
-SubscribedPred =rep( 'no' , nrow(banka_full))
-SubscribedPred[ glm.probs > .5] = 'yes'
-results <- data.frame( banka_full$ID, SubscribedPred, banka_full
-                       $y)
-results <- results %>% mutate( match = ifelse( SubscribedPred == banka_full.y , 1 , 0))
+SubscribedPred =rep( 0 , nrow(banka_full))
+SubscribedPred[ glm.probs > .5] = 1
+results <- data.frame( banka_full$ID, SubscribedPred, banka_full$output)
+results <- results %>% mutate( match = ifelse( SubscribedPred == banka_full.output , 1 , 0))
 head(results)
 
 #how well does glm.probs fit test
-table(results$Subscribed, banka_full$y)
+table(results$SubscribedPred, banka_full$output)
 sum(results$match)/nrow(results)
 # 30% correct when predictions for bank-additional-full are compared to actual
 ```
+
 Now, create a model with only the significant variables:
 
 ```{r}
-glm.all <- glm( y ~ age + 
+
+#try to better model by switching what variables are used in model
+glm.new <- glm( y ~ age + 
                   job +
                   marital +
                   education +
@@ -225,7 +236,7 @@ glm.all <- glm( y ~ age +
                   contact +
                   month +
                   day_of_week +
-                  duration +
+                  #duration +
                   campaign +
                   previous +
                   contactedprev +
@@ -233,6 +244,26 @@ glm.all <- glm( y ~ age +
                   cons.price.idx +
                   cons.conf.idx +
                   nr.employed
-                , data = banka , family = binomial) #Note: Used binomial because output is binary
+                , data = banka_full , family = binomial) #Note: Used binomial because output is binary
+
+```
+New model:
+```{r}
+summary(glm.new)
+```
+Things to note: Less likely to subscribe to a term deposit on a monday. Also less likely to subscribe Jan-Mar vs any other month. More likely to subscribe if previously contacted. Blue collar are the mosth likely job to say yes to subscribe.
+```{r}
+#predict if the client subsribed to a term deposit
+glm.probs <- predict(glm.new, banka, type = "response")
+SubscribedPred =rep( 'no' , nrow(banka))
+SubscribedPred[ glm.probs > .5] = 'yes'
+results <- data.frame( banka$ID, SubscribedPred, banka$y)
+results <- results %>% mutate( match = ifelse( SubscribedPred == banka.y , 1 , 0))
+head(results)
+
+#how well does glm.probs fit test
+table(results$Subscribed, banka$y)
+sum(results$match)/nrow(results)
+# 30% correct when predictions for bank-additional-full are compared to actual
 ```
 
