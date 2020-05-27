@@ -89,7 +89,8 @@ banka_full <- read_delim("bank-additional/bank-additional/bank-additional-full.c
     #na = "unknown",
     trim_ws = TRUE)
 
-
+summary(banka)
+summary(banka_full)
 ```
 
 Add unqiue ID to each dataset:
@@ -137,10 +138,10 @@ banka_full$output <- 0
 banka_full$output[banka$y == "yes"] <- 1
 
 ```
-Going to treat 'banka' as a train dataset , banka_full as a test dataset. 'banka' will be used to train the model, and the model will then be tested on banka_full, to guage how accurate it is.
+Going to treat 'banka' as a train dataset , banka_full as a test dataset. 'banka' will be used to train the model, and the model will then be tested on banka_full, to gauge how accurate it is.
 
 
-Create first model using binomial glm (general linear model) :
+Create first model using binomial glm (general linear model) to look at significance of variables :
 ```{r}
 
 glm.all <- glm( output ~ age + 
@@ -168,30 +169,17 @@ summary(glm.all)
 ```
 Things to note: 
 -Less likely to subscribe to a term deposit on a monday. 
-Also less likely to subscribe Jan-Mar vs any other month. More likely to subscribe if previously contacted. Blue collar are the mosth likely job to say yes to subscribe.
+-Highly significant if contacted on a telephone number vs cellphone
+-Management and self-employed seem to be more significant than other occupations
+-Social/Economic variables are significant
 
- Predict. Store predicted in results data set , and compare to actual:
-```{r}
-#predict if the client subsribed to a term deposit
-glm.probs <- predict(glm.all, banka_full, type = "response")
-#getting "Prediction from a rank-deficient fit may be misleading" message, because of so many input variables
-SubscribedPred =rep( 0 , nrow(banka_full))
-SubscribedPred[ glm.probs > .5] = 1
-results <- data.frame( banka_full$ID, SubscribedPred, banka_full$output)
-results <- results %>% mutate( match = ifelse( SubscribedPred == banka_full.output , 1 , 0))
-head(results)
+ 
 
-#how well does glm.probs fit test
-table(results$SubscribedPred, banka_full$output)
-sum(results$match)/nrow(results)
-#86.09% correct when predictions for bank-additional-full are compared to actual
-
-```
 Now, create a model with only the significant variables:
 
 ```{r}
 
-#try to better model by switching what variables are used in model. Only use top significant values.
+#try to better model by switching what variables are used in model. Only use top 5 significant values.
 glm.new <- glm( output ~ 
                   #age + 
                   #job +
@@ -222,6 +210,7 @@ New model:
 summary(glm.new)
 ```
 
+Predict. Store predicted in results data set , and compare to actual:
 ```{r}
 #predict if the client subsribed to a term deposit
 glm.probs <- predict(glm.new, banka_full, type = "response")
@@ -238,10 +227,10 @@ sum(results$match)/nrow(results)
 ```
 
 
-Model "glm.new" has an acceptable result of 86.29% accuracy. This number, shows that the model fits the dataset, but is not to close to overfitting.
+Model "glm.new" has an acceptable result of 86.89% accuracy. This number, shows that the model fits the dataset, but is not too close to overfitting.
 
 
-Plot relationship between clients subscribing a term deposit(y) and the metrics used in the model:
+Plot relationship between clients subscribing to a term deposit(y) and the metrics used in the model:
 ```{r}
 
 #prelimary graph, to draw initial conclusions
@@ -255,9 +244,10 @@ library(scales)
 #ggplot(banka_full) + 
   #geom_col(aes(x=month   fill = y))
   #geom_bar( aes(fill=y))
- 
   #stat_smooth(method="glm", method.args=list(family="binomial"), se=FALSE)
 
+#crate graphs for differenct input variables
+#using bar plot for categorical varibles
 age <- ggplot(banka, aes(fill=y , x = age)) +
   geom_bar(position = "stack" , stat= "count")  +
    geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
@@ -287,6 +277,7 @@ job <- ggplot(banka, aes(fill=y , x = job )) +
   theme(axis.text.x = element_text(angle = 90))  +
    geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
 
+#using line instead of bar chart for numerical variables
 cons.conf.idx <- ggplot(banka, aes( x = cons.conf.idx)) +
   geom_line(  aes(color = y),  stat = "count") +
   geom_point( aes(color = y), stat = "count")
@@ -299,9 +290,10 @@ cons.price.idx <- ggplot(banka, aes( x = cons.price.idx)) +
   
 emp.var.rate <- ggplot(banka, aes( x = emp.var.rate)) +
   geom_line(  aes(color = y),  stat = "count") +
-  geom_point( aes(color = y), stat = "count")
+  geom_point( aes(color = y), stat = "count") 
+
  
-   
+ #graphs for significant variables  
 month
 contact
 cons.conf.idx
