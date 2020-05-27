@@ -1,3 +1,3 @@
 # MyProjects
- My projects created with R 
+ My public projects created with R 
  Updated May 2020
