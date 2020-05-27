@@ -6,63 +6,18 @@ output: html_notebook
 Goal: predict if the client will subscribe a term deposit (variable y)
   Note: Y will be a binomial result, either yes or no
 
-Step 1) Import Data
+MP , 5/27/2020
+--
+
+Import and factor Data:
 ```{r}
 getwd()
-setwd( paste(getwd() , "/BankAnalysis_Study"))
+setwd( paste(getwd() , "/BankAnalysis_Study/bank-additional/bank-additional/"))
 library(readr)
 library(dplyr)
 library(ggplot2)
- bank <- bank <- read_delim("bank/bank.csv", 
-    ";", escape_double = FALSE, 
-    col_types = cols(age = col_double(), 
-         balance = col_double(), 
-         campaign = col_integer(), 
-         contact = col_factor(levels = c("cellular", "telephone")), 
-         day = col_integer(), 
-         default = col_factor(levels = c("yes","no")), 
-         duration = col_double(), 
-         education = col_factor(levels = c("primary" , "secondary" , "tertiary")),
-        # education = col_factor(levels = c("basic.4y",  "basic.6y", "basic.9y", "high.school", 
-        #     "illiterate", "professional.course", 
-        #     "university.degree")),
-         housing = col_factor(levels = c("yes", "no")),
-         job = col_factor(levels = c("admin.", 
-             "blue-collar", "entrepreneur", 
-             "housemaid", "management", 
-             "retired", "self-employed", 
-             "services", "student", "technician", 
-             "unemployed")), 
-         loan = col_factor(levels = c("yes", "no")), 
-         marital = col_factor(levels = c("divorced", "married", "single")), 
-         month = col_factor(levels = c("jan", 
-             "feb", "mar", "apr", "may", "jun", 
-             "jul", "aug", "sep", "oct", "nov", 
-             "dec")), 
-         pdays = col_number(), 
-         poutcome = col_factor(levels = c("failure", "nonexistent", "success" , "other")), 
-         previous = col_number(), 
-         y = col_factor(levels = c("yes","no"))), 
-    na = "unknown",
-    trim_ws = TRUE)
- 
-bank_full <- read_delim("bank/bank-full.csv", 
-     ";", 
-     escape_double = FALSE, 
-     col_types = cols(age = col_integer(), 
-         balance = col_double(), campaign = col_integer(), 
-         contact = col_character(), day = col_integer(), 
-         default = col_factor(levels = c("yes", 
-             "no")), duration = col_double(), 
-         education = col_character(), housing = col_factor(levels = c("yes", 
-             "no")), job = col_character(), 
-         marital = col_character(), month = col_character(), 
-         pdays = col_double(), poutcome = col_character(), 
-         y = col_factor(levels = c("yes", 
-             "no"))), 
-     na = "unknown", 
-     trim_ws = TRUE)
 
+#------------------------------------------------------------------------------------------
 banka <- read_delim("bank-additional/bank-additional/bank-additional.csv", 
     ";", escape_double = FALSE, 
     col_types = cols(age = col_double(), 
@@ -136,29 +91,30 @@ banka_full <- read_delim("bank-additional/bank-additional/bank-additional-full.c
 
 
 ```
-Add unqiue ID :
 
+Add unqiue ID to each dataset:
 ```{r}
 banka$ID <- seq.int(nrow(banka))
 banka_full$ID <- seq.int(nrow(banka_full))
 ```
 
 
-
-
-Deal with NULL/missing values
+Look at null/Missing values:
 ```{r}
-summary(banka$pdays) 
-banka$pdays[banka$pdays == 999] <- NA
-
-summary(banka_full$pdays) 
-banka_full$pdays[banka_full$pdays == 999] <- NA
-
-na_count <-sapply(banka, function(y) sum(length(which(is.na(y)))))
-na_count 
 
 
-##too many pday values are 999 or NA, create a cateogrical column instead
+#The below code changes 999 to be NA's. Decided this is unneccesary and commented this out because I'd rather make a categorical column to represent pdays. Too many NA's arn't good for , and leaving the 999 would skew that data if it was treaded as numerical.
+# summary(banka$pdays) 
+# banka$pdays[banka$pdays == 999] <- NA
+# 
+# summary(banka_full$pdays) 
+# banka_full$pdays[banka_full$pdays == 999] <- NA
+# 
+# na_count <-sapply(banka, function(y) sum(length(which(is.na(y)))))
+# na_count 
+
+
+##too many pday values are 999 or NA, creating a cateogrical column instead
 banka$contactedprev <- 'Yes'
 banka$contactedprev[ banka$pdays == 999 ] <- 'No'
 banka$contactedprev <-factor(banka$contactedprev)
@@ -169,16 +125,22 @@ banka_full$contactedprev[ banka_full$pdays == 999 ] <- 'No'
 banka_full$contactedprev <-factor(banka_full$contactedprev)
 summary(banka_full$contactedprev)
 
-#change y column to be 1's and 0's to help model?
+```
+
+```{r}
+#change y column to be 1's and 0's for binomial model
 banka$output <- 0 
-#banka$output[banka$y == "no"] <- 0
 banka$output[banka$y == "yes"] <- 1
 
-#change y column to be 1's and 0's to help model?
+#change y column to be 1's and 0's for the model
 banka_full$output <- 0 
 banka_full$output[banka$y == "yes"] <- 1
+
 ```
-Create first model using binomial glm. 
+Going to treat 'banka' as a train dataset , banka_full as a test dataset. 'banka' will be used to train the model, and the model will then be tested on banka_full, to guage how accurate it is.
+
+
+Create first model using binomial glm (general linear model) :
 ```{r}
 
 glm.all <- glm( output ~ age + 
@@ -195,17 +157,20 @@ glm.all <- glm( output ~ age +
                    campaign +
                    previous +
                    poutcome +
-                  # contactedprev +
+                   contactedprev +
                    emp.var.rate +
                    cons.price.idx +
                    cons.conf.idx +
                    nr.employed
-                , data = banka  , family = binomial) #Note: Used binomial because output is binary
+                , data = banka  , family = binomial) #Note: Used binomial because result is binary 
 
 summary(glm.all)
 ```
+Things to note: 
+-Less likely to subscribe to a term deposit on a monday. 
+Also less likely to subscribe Jan-Mar vs any other month. More likely to subscribe if previously contacted. Blue collar are the mosth likely job to say yes to subscribe.
 
-Predict. Store predicted in results data set , and compare to actual
+ Predict. Store predicted in results data set , and compare to actual:
 ```{r}
 #predict if the client subsribed to a term deposit
 glm.probs <- predict(glm.all, banka_full, type = "response")
@@ -219,17 +184,17 @@ head(results)
 #how well does glm.probs fit test
 table(results$SubscribedPred, banka_full$output)
 sum(results$match)/nrow(results)
-#86% correct when predictions for bank-additional-full are compared to actual
-```
+#86.09% correct when predictions for bank-additional-full are compared to actual
 
+```
 Now, create a model with only the significant variables:
 
 ```{r}
 
-#try to better model by switching what variables are used in model
+#try to better model by switching what variables are used in model. Only use top significant values.
 glm.new <- glm( output ~ 
                   #age + 
-                  job +
+                  #job +
                   #marital +
                   #education +
                   #default +
@@ -237,10 +202,10 @@ glm.new <- glm( output ~
                   #loan +
                   contact +
                   month +
-                  day_of_week +
-                  poutcome +
+                  #day_of_week +
+                  #poutcome +
                   #duration +
-                  #campaign +
+                  #campaign 
                   #previous +
                   #contactedprev +
                   emp.var.rate +
@@ -256,7 +221,7 @@ New model:
 ```{r}
 summary(glm.new)
 ```
-Things to note: Less likely to subscribe to a term deposit on a monday. Also less likely to subscribe Jan-Mar vs any other month. More likely to subscribe if previously contacted. Blue collar are the mosth likely job to say yes to subscribe.
+
 ```{r}
 #predict if the client subsribed to a term deposit
 glm.probs <- predict(glm.new, banka_full, type = "response")
@@ -269,6 +234,85 @@ head(results)
 #how well does glm.probs fit test
 table(results$SubscribedPred, banka_full$output)
 sum(results$match)/nrow(results)
-# 86% correct when predictions for bank-additional-full are compared to actual
+# 86.89% correct when predictions for bank-additional-full are compared to actual
 ```
+
+
+Model "glm.new" has an acceptable result of 86.29% accuracy. This number, shows that the model fits the dataset, but is not to close to overfitting.
+
+
+Plot relationship between clients subscribing a term deposit(y) and the metrics used in the model:
+```{r}
+
+#prelimary graph, to draw initial conclusions
+plot( banka_full$y ~  banka_full$poutcome + banka_full$month + banka_full$contact +  
+        banka_full$campaign + banka_full$job)
+
+#(more colorful) graphs to show relationships between certain variables
+library(ggplot2)
+library(gridExtra)
+library(scales)
+#ggplot(banka_full) + 
+  #geom_col(aes(x=month   fill = y))
+  #geom_bar( aes(fill=y))
+ 
+  #stat_smooth(method="glm", method.args=list(family="binomial"), se=FALSE)
+
+age <- ggplot(banka, aes(fill=y , x = age)) +
+  geom_bar(position = "stack" , stat= "count")  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+poutcome <- ggplot(banka, aes(fill=y , x = day_of_week)) +
+  geom_bar(position = "stack" , stat= "count")  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+month <- ggplot(banka, aes(fill=y , x = month)) +
+  geom_bar(position = "stack" , stat= "count")  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+poutcome <- ggplot(banka, aes(fill=y , x = poutcome)) +
+  geom_bar(position = "stack" , stat= "count")  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+contact <- ggplot(banka, aes(fill=y , x = contact)) +
+  geom_bar(position = "stack" , stat= "count")  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+campaign <- ggplot(banka, aes(fill=y , x = campaign)) +
+  geom_bar(position = "stack" , stat= "count")  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+job <- ggplot(banka, aes(fill=y , x = job )) +
+  geom_bar(position = "stack" , stat= "count" ) +
+  theme(axis.text.x = element_text(angle = 90))  +
+   geom_text( aes(label = stat(count)) , stat = 'count', size = 2.5, position = position_stack(vjust = 0.5))
+
+cons.conf.idx <- ggplot(banka, aes( x = cons.conf.idx)) +
+  geom_line(  aes(color = y),  stat = "count") +
+  geom_point( aes(color = y), stat = "count")
+  
+
+cons.price.idx <- ggplot(banka, aes( x = cons.price.idx)) +
+  geom_line(  aes(color = y),  stat = "count") +
+  geom_point( aes(color = y), stat = "count")
+
+  
+emp.var.rate <- ggplot(banka, aes( x = emp.var.rate)) +
+  geom_line(  aes(color = y),  stat = "count") +
+  geom_point( aes(color = y), stat = "count")
+ 
+   
+month
+contact
+cons.conf.idx
+cons.price.idx
+emp.var.rate
+
+
+
+
+
+```
+
+
 
