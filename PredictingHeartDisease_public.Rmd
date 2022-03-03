@@ -1,0 +1,496 @@
+---
+title: "Identification of Heart Disease from Common Indicators"
+author: "Collaboration Project amoung Wayne States Students"
+output:
+  word_document: default
+  html_document: default
+---
+Three levels of models have been produced.
+Predictors were eliminated by Backwards Selection to minimize AIC score.
+
+
+Fine tuning ideas:
+1. split observations by sex and run logistic models for each of these sets
+2. Split observations by first N (1,2,3) discriminating predictors from decision tree and run logistic models for each combination.
+
+
+Data downloaded from Kaggle:
+https://www.kaggle.com/ronitf/heart-disease-uci
+
+
+Call libraries and read in dataset
+```{r}
+library(readr)
+library(MASS)
+library(class)
+library(rpart)
+library(rpart.plot)
+library(e1071)
+heart <- read_csv("C:\\Users\\mapet\\Documents\\WayneState_classes\\DSA600_DataScienceAndAnalytics\\R files\\FinalProject_2\\heart.csv")
+
+```
+
+Quick look at data
+```{r}
+summary(heart)
+head(heart)
+
+
+```
+
+Create Functions
+```{r}
+
+ROC_func <- function(df, label_colnum, score_colnum, add_on = F, color = "black"){
+  # Sort by score (high to low)
+  df <- df[order(-df[,score_colnum]),]
+  rownames(df) <- NULL  # Reset the row number to 1,2,3,...
+  n <- nrow(df)
+  # Total # of positive and negative cases in the data set
+  P <- sum(df[,label_colnum] == 1)
+  N <- sum(df[,label_colnum] == 0)
+  
+  # Vectors to hold the coordinates of points on the ROC curve
+  TPR <- c(0,vector(mode="numeric", length=n))
+  FPR <- c(0,vector(mode="numeric", length=n))
+  
+  # Calculate the coordinates from one point to the next
+  AUC = 0
+  for(k in 1:n){
+    if(df[k,label_colnum] == 1){
+      TPR[k+1] = TPR[k] + 1/P
+      FPR[k+1] = FPR[k]
+    } else{
+      TPR[k+1] = TPR[k]
+      FPR[k+1] = FPR[k] + 1/N
+      AUC = AUC + TPR[k+1]*(1/N)
+    }                                                      
+  }
+  
+  # Plot the ROC curve
+  if(add_on){
+    points(FPR, TPR, main=paste0("ROC curve"," (n = ", n, ")"), type = 'l', col=color, cex.lab = 1.2, cex.axis = 1.2, cex.main = 1.2)
+  } else{
+    plot(FPR, TPR, main=paste0("ROC curve"," (n = ", n, ")"), type = 'l', col=color, cex.lab = 1.2, cex.axis = 1.2, cex.main = 1.2)
+  }
+  return(AUC)
+}
+
+resetSets <- function(){
+  trainset <<- sample(1:nrow(heart), round(nrow(heart)*0.7))
+  validset <<- setdiff(1:nrow(heart),trainset)
+}
+
+errorRate <- function(newData){
+  pred <- func2(newData)
+  correct <- sum(ifelse(pred==newData$target,1,0))
+  return(1-(correct/nrow(newData)))
+}
+
+errorMatrix <- function(newData){
+  pred <- func2(newData)
+  err1 <- sum(ifelse(pred==1,ifelse(newData$target==1,1,0),0))
+  err2 <- sum(ifelse(pred==1,ifelse(newData$target==0,1,0),0))
+  err3 <- sum(ifelse(pred==0,ifelse(newData$target==1,1,0),0))
+  err4 <- sum(ifelse(pred==0,ifelse(newData$target==0,1,0),0))
+  
+  totalerror <- (err2+err3)/nrow(pred)
+  
+cat(sprintf("PTrue-LTrue: %s\n", err1))
+cat(sprintf("PTrue-LFalse: %s\n", err2))
+cat(sprintf("PFalse-LTrue: %s\n", err3))
+cat(sprintf("PFalse-LFalse: %s\n", err4))
+cat(sprintf("Total Error: %s\n", totalerror))
+}
+
+resetSets()
+```
+
+# Logistic Model
+
+Confirmation Model
+
+```{r}
+#Model
+df.log.confirmation <- glm(target ~ sex + cp + exang + thalach + oldpeak + ca + thal, data = heart, subset = trainset, family = "binomial")
+
+#Summary of model
+summary(df.log.confirmation)
+```
+
+```{r}
+#Scoring Functions
+
+#Function containing model
+
+func1 <- function(newData)  {
+  len <- nrow(newData)
+  scores <- numeric(len)
+  for (i in 1:len)  {
+    val <- 0.37171  +  newData[i,'sex']*(-1.67767) +  newData[i,'cp']*(0.98436) +  newData[i,'exang']*(-1.10948) +  newData[i,'thalach']*(0.03018) +  newData[i,'oldpeak']*(-1.05497) +  newData[i,'ca']*(-0.85910) +  newData[i,'thal']*(-1.18683)
+    scores[i] <- exp(val)/(1+exp(val))
+  }
+  return(scores)
+}
+
+#Manually chose optimal threshold, that optimized AUC
+threshold <- 0.55
+
+#Function turns score values into categorical predictions using threshold
+func2 <- function(newData)   {
+  scores <- func1(newData)
+  
+  prediction <- numeric(nrow(newData))
+  prediction <- ifelse(scores>threshold,1,0)
+  return(prediction)
+}
+
+#Calculate ROC curve, AUC value, confusion matrix and error Rate
+df_score_truelabel <- data.frame(func2(heart[validset,]),true.label = heart[validset,'target'])
+head(df_score_truelabel)
+df.log.confirmation.AUC <- ROC_func(df_score_truelabel, 1, 2, color = 'red')
+df.log.confirmation.ErrorR <- errorRate(newData = heart[validset,])
+
+cat(sprintf("Threshold: %s\n", threshold))
+cat(sprintf("Total Error: %s\n", df.log.confirmation.ErrorR))
+cat(sprintf("AUC: %s\n", df.log.confirmation.AUC))
+errorMatrix(heart[validset,])
+
+
+```
+
+Classification Model
+
+```{r}
+
+#Modelling
+df.log.classification <- glm(target ~ sex + cp + thalach + exang + oldpeak, data = heart, subset = trainset, family = "binomial")
+summary(df.log.classification )
+```
+```{r}
+#Scoring Functions
+# Function for model
+func1 <- function(newData)  {
+  len <- nrow(newData)
+  scores <- numeric(len)
+  
+  for (i in 1:len)  {
+    val <- -3.14787  +  newData[i,'sex']*(-1.97844)  +  newData[i,'cp']*(1.04538)  +  newData[i,'thalach']*(0.033864)  +  newData[i,'exang']*(-1.21676)  +  newData[i,'oldpeak']*(-1.11956)
+    scores[i] <- exp(val)/(1+exp(val))
+  }
+  return(scores)
+}
+
+#Function turns score values into categorical predictions using threshold
+func2 <- function(newData)   {
+  scores <- func1(newData)
+  threshold <- 0.6 #Manually chose optimal threshold, that optimized AUC
+  prediction <- numeric(nrow(newData))
+  prediction <- ifelse(scores>threshold,1,0)
+  return(prediction)
+}
+
+#Calculate ROC curve, AUC value, confusion matrix and error Rate
+df_score_truelabel <- data.frame(func2(heart[validset,]),true.label = heart[validset,'target'])
+head(df_score_truelabel)
+df.log.classification.AUC <- ROC_func(df_score_truelabel, 1, 2, color = 'orange')
+df.log.classification.ErrorR <- errorRate(newData = heart[validset,])
+
+
+cat(sprintf("Total Error: %s\n", df.log.classification.ErrorR))
+cat(sprintf("AUC: %s\n", df.log.classification.AUC))
+
+errorMatrix(heart[validset,])
+
+```
+
+Early Warning Model
+```{r}
+
+#Modelling
+
+df.log.alarm <- glm(target ~ age + sex + cp + trestbps, data = heart, subset = trainset, family = "binomial")
+summary(df.log.alarm)
+```
+```{r}
+#Scoring Functions
+#Function for model
+func1 <- function(newData)  {
+  len <- nrow(newData)
+  scores <- numeric(len)
+  
+  for (i in 1:len)  {
+    val <- 6.56547  +  newData[i,'age']*(-0.06335)  +  newData[i,'sex']*(-1.75071)  +  newData[i,'cp']*(1.08806)  +  newData[i,'trestbps']*(-0.02126)
+    scores[i] <- exp(val)/(1+exp(val))
+  }
+  return(scores)
+}
+
+#Function turns score values into categorical predictions using threshold
+func2 <- function(newData)   {
+  scores <- func1(newData)
+  threshold <- 0.4 #Manually chose optimal threshold, that optimized AUC
+  prediction <- numeric(nrow(newData))
+  prediction <- ifelse(scores>threshold,1,0)
+  return(prediction)
+}
+
+#Calculate ROC curve, AUC value, confusion matrix and error Rate
+df_score_truelabel <- data.frame(func2(heart[validset,]),true.label = heart[validset,'target'])
+head(df_score_truelabel)
+df.log.alarm.AUC <- ROC_func(df_score_truelabel, 1, 2 , color = 'green')
+df.log.alarm.ErrorR <- errorRate(newData = heart[validset,])
+
+
+cat(sprintf("Total Error: %s\n", df.log.alarm.ErrorR))
+cat(sprintf("AUC: %s\n", df.log.alarm.AUC))
+
+errorMatrix(heart[validset,])
+
+```
+
+# KNN Model
+
+
+Confirmation Model
+
+```{r}
+#subsets as s
+earlywarning <- 6 #earlywarning
+classification <- 11 #Classification
+confirmation <- 13 #Confirmation
+
+
+s = confirmation
+
+#This sets all three predictor subsets: Early Alarm, Classification, Confirmation
+traindata <- heart[trainset, c(1:s,14) ]
+testdata <- heart[validset, c(1:s,14)]
+hrt <- heart[, c(1:s,14)]
+('-----------------------------------------------------')
+(s)
+
+
+#Normalizing the data makes the accuracy jump higher in calculations below
+normalize <- function(x){return ((x - min(x)) / (max(x) - min(x))) }
+heart_n <- as.data.frame(lapply(hrt[,], normalize))
+n <- length(heart_n)-1
+
+#KNN model
+#Manually tested different K values for the best accuracy
+pred_knn <- knn(train= heart_n[trainset, 1:n], test=heart_n[validset, 1:n], cl=heart[trainset,]$target, k=25)
+
+#Confusion Matrix table
+table( predictions = pred_knn, target = heart[validset,]$target)
+
+
+#Error Rate
+( sum(ifelse(pred_knn == heart[validset,]$target, 1, 0))/ length(heart[validset,]$target))
+
+
+#create an AUC curve
+knn_pred_truelabel <- data.frame(pred_knn, heart[validset,]$target)
+heart.knn.AUC <- ROC_func(knn_pred_truelabel, 1, 2 , color = 'red')
+(heart.knn.AUC)
+
+
+```
+
+Classification Model
+
+```{r}
+
+s =classification
+
+#This sets all three predictor subsets: Early Alarm, Classification, Confirmation
+traindata <- heart[trainset, c(1:s,14) ]
+testdata <- heart[validset, c(1:s,14)]
+hrt <- heart[, c(1:s,14)]
+('-----------------------------------------------------')
+(s)
+
+
+#Normalizing the data makes the accuracy jump higher in calculations below
+normalize <- function(x){return ((x - min(x)) / (max(x) - min(x))) }
+heart_n <- as.data.frame(lapply(hrt[,], normalize))
+n <- length(heart_n)-1
+
+#KNN model
+#Manually tested different K values for the best accuracy
+pred_knn <- knn(train= heart_n[trainset, 1:n], test=heart_n[validset, 1:n], cl=heart[trainset,]$target, k=20)
+
+#Confusion Matrix table
+table( predictions = pred_knn, target = heart[validset,]$target)
+
+
+#Error Rate
+( sum(ifelse(pred_knn == heart[validset,]$target, 1, 0))/ length(heart[validset,]$target))
+
+
+
+#create an AUC curve
+knn_pred_truelabel <- data.frame(pred_knn, heart[validset,]$target)
+heart.knn.AUC <- ROC_func(knn_pred_truelabel, 1, 2 , color = 'orange')
+(heart.knn.AUC)
+```
+
+Early Warning Model
+```{r}
+
+
+s = earlywarning
+
+#This sets all three predictor subsets: Early Alarm, Classification, Confirmation
+traindata <- heart[trainset, c(1:s,14) ]
+testdata <- heart[validset, c(1:s,14)]
+hrt <- heart[, c(1:s,14)]
+('-----------------------------------------------------')
+(s)
+
+
+#Normalizing the data makes the accuracy jump higher in calculations below
+normalize <- function(x){return ((x - min(x)) / (max(x) - min(x))) }
+heart_n <- as.data.frame(lapply(hrt[,], normalize))
+n <- length(heart_n)-1
+
+#KNN model
+#Manually tested different K values for the best accuracy
+pred_knn <- knn(train= heart_n[trainset, 1:n], test=heart_n[validset, 1:n], cl=heart[trainset,]$target, k=15)
+
+#Confusion Matrix table
+table( predictions = pred_knn, target = heart[validset,]$target)
+
+
+#Error Rate
+( sum(ifelse(pred_knn == heart[validset,]$target, 1, 0))/ length(heart[validset,]$target))
+
+
+#create an AUC curve
+knn_pred_truelabel <- data.frame(pred_knn, heart[validset,]$target)
+heart.knn.AUC <- ROC_func(knn_pred_truelabel, 1, 2, color = 'green')
+(heart.knn.AUC)
+```
+
+# Decision Tree
+
+
+Confirmation Model
+
+```{r}
+
+tree_hrt_conf <- rpart(target ~ . -trestbps -slope -restecg -exang -chol -sex -age -thalach -oldpeak -fbs, data = heart,method = 'class',  subset = trainset)
+#tree_flight
+rpart.plot(tree_hrt_conf)
+summary(tree_hrt_conf)
+
+```
+
+Classification Model
+
+```{r}
+tree_hrt_class <- rpart(target ~age+sex+cp+trestbps+chol+fbs+restecg+thalach+exang+oldpeak+slope, data = heart,method = 'class',  subset = trainset)
+
+rpart.plot(tree_hrt_class)
+summary(tree_hrt_class)
+```
+```{r}
+t_pred = predict(tree_hrt_class,heart[validset,],type="class")
+(confMat <- table(heart[validset,]$target,t_pred))
+(accuracy <- sum(diag(confMat))/sum(confMat))
+
+
+```
+
+Early Warning Model
+```{r}
+tree_hrt_early <- rpart(target ~age+sex+cp+chol, data = heart,method = 'class',  subset = trainset)
+#tree_flight
+rpart.plot(tree_hrt_early)
+summary(tree_hrt_early)
+
+t_pred = predict(tree_hrt_early,heart[validset,],type="class")
+(confMat <- table(heart[validset,]$target,t_pred))
+(accuracy <- sum(diag(confMat))/sum(confMat))
+
+```
+
+# Naive Bayes
+
+```{r}
+#Converting to categorical type
+heart$sex <- as.factor(heart$sex) 
+heart$cp <- as.factor(heart$cp)
+heart$fbs <- as.factor(heart$fbs)
+heart$restecg <- as.factor(heart$restecg)
+heart$exang <- as.factor(heart$exang)
+heart$slope <- as.factor(heart$slope)
+heart$ca <- as.factor(heart$ca)
+heart$thal <- as.factor(heart$thal)
+heart$target <- as.factor(heart$target)
+
+```
+
+
+Confirmation Model
+
+```{r}
+
+#Naive Bayes Model
+nb_full <- naiveBayes(target~., data = heart,  subset = trainset)
+
+#Calculate predictions
+pred1 <- predict(nb_full, heart[validset,])
+
+#Model accuracy
+table(pred1, heart[validset,]$target,dnn = c('Pred','Actual'))
+pred1_raw <- predict(nb_full, heart[validset,],type='raw')
+pred1_df <- data.frame(score = pred1_raw[,'1'], true.class = ifelse(heart[validset,]$target == '1',1,0))
+ROC_func(pred1_df,2,1, color = 'red')
+
+
+```
+
+Classification Model
+
+```{r}
+#Create model
+nb_classification <- naiveBayes(target~ age + sex + cp + trestbps + chol + fbs + restecg + thalach + exang + oldpeak + slope, data = heart, subset = trainset)
+
+#calculate predictions
+pred3 <- predict(nb_classification, heart[validset,])
+
+#Model Accuracy
+table(pred3, heart[validset,]$target, dnn = c('Pred','Actual')) 
+pred3_raw <- predict(nb_classification, heart[validset,],type='raw')
+pred3_df <- data.frame(score = pred3_raw[,'1'], true.class = ifelse(heart[validset,'target'] == '1',1,0))
+ROC_func(pred3_df,2,1, color = 'orange') #removed add_on = T
+#legend(
+#  "bottomright", 
+#  lty=c(1,1,1), 
+#  col=c("red", "orange", "green"), 
+#  legend = c("Confirmation Subset", "Classification Subset", "Early Alarm Subset")
+#)
+
+
+
+```
+
+Early Warning Model
+```{r}
+
+#Create model
+nb_early_alarm <- naiveBayes(target~ age + sex + cp + trestbps + chol + fbs, data = heart, subset = trainset)
+
+#calculate predictions
+pred2 <- predict(nb_early_alarm, heart[validset,])
+
+#Model Accuracy
+table(pred2, heart[validset,]$target,dnn = c('Pred','Actual'))
+pred2_raw <- predict(nb_early_alarm, heart[validset,],type='raw')
+pred2_df <- data.frame(score = pred2_raw[,'1'], true.class = ifelse(heart[validset,'target'] == '1',1,0))
+ROC_func(pred2_df,2,1,  color = 'green') #removed: add_on = T because it didn't work
+
+```
+
+
+Add something comparing all models together
