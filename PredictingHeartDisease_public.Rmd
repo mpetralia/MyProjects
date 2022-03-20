@@ -492,5 +492,3 @@ ROC_func(pred2_df,2,1,  color = 'green') #removed: add_on = T because it didn't 
 
 ```
 
-
-Add something comparing all models together
